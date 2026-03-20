@@ -52,10 +52,8 @@ class _MapScreenState extends State<MapScreen> {
     final result = <amap.Marker>{};
 
     for (final spot in spots) {
-      final isSelected = measurePicks.contains(spot.id);
       result.add(amap.Marker(
         position: xbase.LatLng(spot.lat, spot.lng),
-        icon: _spotIcon(spot, isSelected),
         infoWindow: amap.InfoWindow(
           title: '${spot.emoji} ${spot.name}',
           snippet: spot.meta.isNotEmpty ? spot.meta : spot.desc,
@@ -68,7 +66,6 @@ class _MapScreenState extends State<MapScreen> {
     if (pendingCoord != null) {
       result.add(amap.Marker(
         position: xbase.LatLng(pendingCoord.latitude, pendingCoord.longitude),
-        icon: amap.BitmapDescriptor.defaultMarkerWithHue(amap.BitmapDescriptor.hueYellow),
         infoWindow: const amap.InfoWindow(title: '📍 新地点', snippet: '确认后将添加'),
       ));
     }

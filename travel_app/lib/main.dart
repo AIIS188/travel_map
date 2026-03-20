@@ -13,6 +13,11 @@ import 'utils/app_theme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // ── 高德地图 SDK 初始化（必须在 Hive 之前）────────────────
+  // 注：x_amap_base 2.x 不再需要在 main.dart 初始化，由 amap_map 插件内部处理
+  // 但仍需设置隐私合规声明
+  AMapInitializer.updatePrivacyAgree(AMapService.privacyStatement);
+
   // ── Hive 本地数据库 ──────────────────────────────────────
   await Hive.initFlutter();
   Hive.registerAdapter(SpotAdapter());
@@ -25,11 +30,6 @@ class TravelMapApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // ── 高德 SDK 初始化（需在第一个 Widget build 时调用）───
-    // amap_map ^1.0.15 要求在 context 可用时初始化
-    AMapInitializer.init(context, apiKey: AMapService.apiKey);
-    AMapInitializer.updatePrivacyAgree(AMapService.privacyStatement);
-
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => SpotProvider()..init()),

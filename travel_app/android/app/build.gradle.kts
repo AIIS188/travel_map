@@ -28,7 +28,7 @@ android {
         manifestPlaceholders["AMAP_KEY"] = "ce104b17baffde58b352cc8d288964f2"
 
         ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86_64")
+            abiFilters += listOf("armeabi-v7a", "arm64-v8a")
         }
     }
 

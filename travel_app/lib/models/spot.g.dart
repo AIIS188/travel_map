@@ -27,7 +27,7 @@ class SpotAdapter extends TypeAdapter<Spot> {
       color: fields[7] as String,
       category: fields[8] as String,
       isCustom: fields[9] as bool,
-      photoBase64: (fields[10] as List).cast<String>(),
+      photoBase64: (fields[10] as List?)?.cast<String>(),
     );
   }
 
