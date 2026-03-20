@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 高德地图服务域名（含瓦片、API、定位服务） -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">is.autonavi.com</domain>
+        <domain includeSubdomains="true">autonavi.com</domain>
+        <domain includeSubdomains="true">amap.com</domain>
+        <domain includeSubdomains="true">amap-sdk.com</domain>
+    </domain-config>
+</network-security-config>

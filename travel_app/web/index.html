@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <!--
+    大理洱海旅游地图 - Flutter Web
+    
+    高德地图瓦片在 Web 端存在 CORS 跨域限制。
+    解决方案：
+      方案A（推荐）：使用 CORS 代理，在 tile URL 前加 https://corsproxy.io/?
+      方案B：部署自己的瓦片代理服务
+      方案C：换用 OpenStreetMap（已在代码注释中备用）
+    
+    本文件已设置正确的 meta 标签。
+  -->
+  <base href="$FLUTTER_BASE_HREF">
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="大理洱海旅游地图">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="洱海地图">
+  <meta name="msapplication-navbutton-color" content="#667EEA">
+  <meta name="theme-color" content="#667EEA">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+  <title>大理洱海旅游地图</title>
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+  <script>
+    window.addEventListener('load', function(ev) {
+      _flutter.loader.loadEntrypoint({
+        serviceWorker: {
+          serviceWorkerVersion: serviceWorkerVersion,
+        }
+      }).then(function(engineInitializer) {
+        return engineInitializer.initializeEngine();
+      }).then(function(appRunner) {
+        return appRunner.runApp();
+      });
+    });
+  </script>
+  <script src="flutter.js" defer></script>
+</body>
+</html>

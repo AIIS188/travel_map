@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大理洱海旅游地图</title>
+    <!-- 高德安全密钥（必须在 API 加载前） -->
+    <script>
+        window._AMapSecurityConfig = { securityJsCode: 'abd1fb11732f0c80e5d8f04e54a63a71' };
+    </script>
+    <script src="https://webapi.amap.com/maps?v=2.0&key=adb725bb39b7f4ec0dca22d69e74d780&plugin=AMap.PlaceSearch"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #1a1a2e; }
+        .page { display: flex; flex-direction: column; height: 100vh; }
+
+        /* ── header ── */
+        .header {
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            gap: 12px;
+        }
+        .header-left { display: flex; align-items: baseline; gap: 10px; }
+        .header h1 { font-size: 1.3em; }
+        .header p  { font-size: 0.82em; opacity: 0.8; }
+        .header-btns { display: flex; gap: 8px; align-items: center; }
+        .hbtn {
+            padding: 5px 13px;
+            border-radius: 20px;
+            border: 2px solid rgba(255,255,255,0.55);
+            background: transparent;
+            color: white;
+            font-size: 0.78em;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Microsoft YaHei', sans-serif;
+            white-space: nowrap;
+        }
+        .hbtn:hover { background: rgba(255,255,255,0.15); }
+        .hbtn.active-green  { background: #34d399; border-color: #34d399; }
+        .hbtn.active-pink   { background: #ff6b9d; border-color: #ff6b9d; }
+
+        #map { flex: 1; width: 100%; }
+
+        /* ── 测距提示条 ── */
+        #measureHint {
+            display: none;
+            position: absolute;
+            top: 0; left: 50%;
+            transform: translateX(-50%);
+            background: rgba(20,20,30,0.88);
+            color: #e0e0e0;
+            padding: 5px 18px;
+            border-radius: 0 0 10px 10px;
+            font-size: 0.8em;
+            z-index: 1000;
+            white-space: nowrap;
+        }
+        #measureHint.visible { display: block; }
+        #measureHint span { color: #34d399; font-weight: bold; }
+
+        /* ── 测距结果 ── */
+        #measureResult {
+            display: none;
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 16px;
+            padding: 20px 28px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+            z-index: 2000;
+            min-width: 200px;
+        }
+        #measureResult.visible { display: block; }
+        #measureResult .from-to { font-size: 0.85em; color: #888; margin-bottom: 8px; }
+        #measureResult .dist { font-size: 2em; font-weight: bold; color: #34d399; }
+        #measureResult .dist-unit { font-size: 0.85em; color: #aaa; margin-top: 2px; }
+        #measureResult .close-btn {
+            margin-top: 14px; padding: 5px 20px;
+            border: none; border-radius: 20px;
+            background: #f0f0f0; cursor: pointer;
+        }
+
+        /* ── 坐标调试面板 ── */
+        #coordPanel {
+            display: none;
+            position: absolute;
+            bottom: 30px; left: 10px;
+            background: rgba(20,20,30,0.93);
+            color: #e0e0e0;
+            border-radius: 12px;
+            padding: 12px 14px;
+            font-size: 0.74em;
+            z-index: 1000;
+            min-width: 260px;
+            max-height: 70vh;
+            overflow-y: auto;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+            font-family: 'Consolas', monospace;
+        }
+        #coordPanel.visible { display: block; }
+        #coordPanel h5 { color: #ff6b9d; margin-bottom: 8px; font-family: 'Microsoft YaHei', sans-serif; font-size: 1em; }
+        .coord-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.07); gap: 8px;
+        }
+        .coord-name { color: #aaa; white-space: nowrap; }
+        .coord-val  { color: #7dd3fc; font-size: 0.95em; }
+        .coord-val.changed { color: #86efac; }
+        .panel-btn {
+            margin-top: 8px; width: 100%; padding: 5px;
+            border: none; border-radius: 6px; cursor: pointer;
+            font-size: 0.88em; font-family: 'Microsoft YaHei', sans-serif;
+        }
+        #copyBtn  { background: #ff6b9d; color: white; }
+        #copyBtn:hover { background: #e05585; }
+
+        /* 新增地点表单 */
+        #addSpotForm {
+            margin-top: 10px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            padding-top: 10px;
+        }
+        #addSpotForm label { color: #aaa; display: block; margin-bottom: 4px; font-family: 'Microsoft YaHei', sans-serif; }
+        #addSpotForm input {
+            width: 100%; padding: 4px 8px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 6px; color: white;
+            font-family: 'Microsoft YaHei', sans-serif;
+            font-size: 0.9em; margin-bottom: 6px;
+        }
+        #addSpotForm input::placeholder { color: #666; }
+        #pickHint { color: #fbbf24; font-size: 0.85em; margin: 4px 0; font-family: 'Microsoft YaHei', sans-serif; display: none; }
+        #addSpotBtn { background: #7dd3fc; color: #1a1a2e; }
+        #addSpotBtn:hover { background: #38bdf8; }
+        #pickBtn { background: rgba(251,191,36,0.2); color: #fbbf24; border: 1px solid #fbbf24; }
+        #pickBtn:hover { background: rgba(251,191,36,0.35); }
+        #pickBtn.picking { background: #fbbf24; color: #1a1a2e; }
+
+        /* ── marker ── */
+        .spot-marker { cursor: pointer; }
+        .spot-pin {
+            display: flex; flex-direction: column; align-items: center;
+            transition: transform 0.2s; transform-origin: bottom center;
+        }
+        .spot-pin:hover { transform: scale(1.2); }
+        .pin-head {
+            width: 38px; height: 38px;
+            border-radius: 50% 50% 50% 0;
+            transform: rotate(-45deg);
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.35);
+            border: 2.5px solid white;
+        }
+        .pin-head .pin-emoji { transform: rotate(45deg); font-size: 1.1em; line-height: 1; }
+        .pin-label {
+            margin-top: 4px; background: white; color: #222;
+            font-size: 0.72em; font-weight: bold;
+            font-family: 'Microsoft YaHei', sans-serif;
+            padding: 2px 7px; border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2); white-space: nowrap;
+        }
+        .spot-marker.measure-selected .pin-head { outline: 3px solid #34d399; outline-offset: 2px; }
+
+        /* ── popup ── */
+        .leaflet-popup-content-wrapper {
+            border-radius: 14px; padding: 0; overflow: hidden;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.2); width: 210px;
+        }
+        .leaflet-popup-content { margin: 0; width: 100% !important; }
+        .leaflet-popup-tip-container { margin-top: -1px; }
+        .popup-inner { padding: 12px 14px 14px; font-family: 'Microsoft YaHei', sans-serif; }
+        .popup-inner h4 { color: #ff6b9d; font-size: 0.95em; margin-bottom: 3px; }
+        .popup-inner .meta { color: #999; font-size: 0.73em; margin-bottom: 5px; }
+        .popup-inner .desc { color: #555; font-size: 0.78em; line-height: 1.5; margin-bottom: 10px; }
+
+        /* 编辑模式 */
+        .popup-view-mode .edit-fields { display: none; }
+        .popup-view-mode .view-fields  { display: block; }
+        .popup-edit-mode .edit-fields  { display: block; }
+        .popup-edit-mode .view-fields  { display: none; }
+
+        .popup-edit-btn {
+            float: right; margin-top: -2px;
+            background: none; border: none;
+            color: #c084fc; font-size: 0.85em;
+            cursor: pointer; padding: 0 2px;
+        }
+        .popup-edit-btn:hover { color: #7c3aed; }
+
+        .edit-fields input, .edit-fields textarea {
+            width: 100%; margin-bottom: 6px;
+            padding: 5px 8px;
+            border: 1.5px solid #e0d0ff;
+            border-radius: 7px;
+            font-size: 0.78em;
+            font-family: 'Microsoft YaHei', sans-serif;
+            outline: none; resize: vertical;
+            color: #333;
+        }
+        .edit-fields input:focus, .edit-fields textarea:focus {
+            border-color: #c084fc;
+        }
+        .edit-fields label {
+            font-size: 0.7em; color: #aaa;
+            display: block; margin-bottom: 2px;
+        }
+        .edit-save-btn {
+            width: 100%; padding: 5px;
+            background: #7c3aed; color: white;
+            border: none; border-radius: 8px;
+            font-size: 0.8em; font-family: 'Microsoft YaHei', sans-serif;
+            cursor: pointer; margin-bottom: 8px;
+        }
+        .edit-save-btn:hover { background: #6d28d9; }
+        .edit-cancel-btn {
+            width: 100%; padding: 4px;
+            background: #f3f4f6; color: #666;
+            border: none; border-radius: 8px;
+            font-size: 0.78em; font-family: 'Microsoft YaHei', sans-serif;
+            cursor: pointer; margin-bottom: 8px;
+        }
+
+        /* ── 照片滚动条 ── */
+        .photo-strip-wrap {
+            position: relative;
+        }
+        .photo-strip {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+            border-radius: 8px;
+            padding-bottom: 2px;
+        }
+        .photo-strip::-webkit-scrollbar { height: 3px; }
+        .photo-strip::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
+        .photo-thumb {
+            flex: 0 0 100%;
+            scroll-snap-align: start;
+            aspect-ratio: 4/3;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            background: #f0f0f0;
+            cursor: pointer;
+        }
+        .photo-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .photo-thumb .del-btn {
+            position: absolute; top: 4px; right: 4px;
+            background: rgba(0,0,0,0.5); color: white;
+            border: none; border-radius: 50%;
+            width: 20px; height: 20px; font-size: 0.7em;
+            cursor: pointer; display: none;
+            align-items: center; justify-content: center;
+        }
+        .photo-thumb:hover .del-btn { display: flex; }
+
+        /* 照片计数 */
+        .photo-counter {
+            text-align: center; font-size: 0.7em; color: #bbb;
+            margin-top: 3px; font-family: 'Microsoft YaHei', sans-serif;
+        }
+
+        /* 拖拽上传区（无图时） */
+        .drop-zone {
+            aspect-ratio: 4/3;
+            border-radius: 8px;
+            border: 2px dashed #ddd;
+            display: flex; align-items: center; justify-content: center;
+            background: #f8f8f8;
+            transition: border-color 0.2s, background 0.2s;
+            cursor: default;
+        }
+        .drop-zone.drag-over { border-color: #ff6b9d; background: #fff0f5; }
+        .drop-zone-text { text-align: center; color: #ccc; font-size: 0.75em; line-height: 1.6; pointer-events: none; }
+        .drop-zone-text .icon { font-size: 1.6em; display: block; }
+
+        /* 有图时底部追加区 */
+        .add-more {
+            margin-top: 5px;
+            border: 2px dashed #e0e0e0;
+            border-radius: 8px;
+            padding: 5px;
+            text-align: center;
+            font-size: 0.72em;
+            color: #bbb;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+        .add-more:hover, .add-more.drag-over { border-color: #ff6b9d; color: #ff6b9d; }
+
+        /* ── Lightbox ── */
+        #lightbox {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.92);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+        #lightbox.visible { display: flex; }
+        #lightbox img {
+            max-width: 90vw; max-height: 88vh;
+            border-radius: 8px;
+            object-fit: contain;
+            user-select: none;
+        }
+        .lb-arrow {
+            position: absolute; top: 50%; transform: translateY(-50%);
+            background: rgba(255,255,255,0.15);
+            color: white; border: none;
+            width: 44px; height: 44px; border-radius: 50%;
+            font-size: 1.3em; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background 0.2s;
+        }
+        .lb-arrow:hover { background: rgba(255,255,255,0.3); }
+        #lbPrev { left: 16px; }
+        #lbNext { right: 16px; }
+        #lbClose {
+            position: absolute; top: 14px; right: 18px;
+            background: none; border: none; color: white;
+            font-size: 1.6em; cursor: pointer; line-height: 1;
+        }
+        #lbCounter {
+            position: absolute; bottom: 16px; left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.6); font-size: 0.85em;
+        }
+
+        /* ── 搜索框 ── */
+        #searchBox {
+            position: absolute;
+            top: 12px; left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            width: min(380px, 88vw);
+        }
+        .search-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        #searchInput {
+            flex: 1;
+            padding: 8px 34px 8px 14px;
+            border-radius: 24px;
+            border: none;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+            font-size: 0.88em;
+            font-family: 'Microsoft YaHei', sans-serif;
+            outline: none;
+            background: white;
+        }
+        #searchClear {
+            position: absolute; right: 116px; top: 10px;
+            background: none; border: none;
+            color: #bbb; font-size: 1em; cursor: pointer;
+            display: none; line-height: 1;
+        }
+        #citySelect {
+            padding: 7px 8px;
+            border-radius: 20px;
+            border: none;
+            background: white;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+            font-size: 0.82em;
+            font-family: 'Microsoft YaHei', sans-serif;
+            cursor: pointer;
+            outline: none;
+            color: #555;
+            flex-shrink: 0;
+        }
+            transform: translateY(-50%);
+            background: none; border: none;
+            color: #bbb; font-size: 1em; cursor: pointer;
+            display: none; line-height: 1;
+        }
+        #searchResults {
+            display: none;
+            background: white;
+            border-radius: 12px;
+            margin-top: 6px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+            overflow: hidden;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+        .search-item {
+            padding: 9px 14px;
+            font-size: 0.82em;
+            font-family: 'Microsoft YaHei', sans-serif;
+            cursor: pointer;
+            border-bottom: 1px solid #f0f0f0;
+            line-height: 1.4;
+        }
+        .search-item:last-child { border-bottom: none; }
+        .search-item:hover { background: #f9f0ff; }
+        .search-item .si-name { color: #333; font-weight: bold; }
+        .search-item .si-addr { color: #999; font-size: 0.9em; margin-top: 1px; }
+        .search-loading { padding: 10px 14px; color: #aaa; font-size: 0.82em; font-family: 'Microsoft YaHei', sans-serif; }
+
+        /* 图例 */
+        .legend {
+            position: absolute; bottom: 30px; right: 10px;
+            background: rgba(255,255,255,0.92);
+            padding: 8px 12px; border-radius: 10px;
+            font-size: 0.75em; box-shadow: 0 2px 10px rgba(0,0,0,0.15); z-index: 1000;
+        }
+        .legend-item { display: flex; align-items: center; gap: 6px; margin: 3px 0; color: #555; }
+        .legend-dot { width: 10px; height: 10px; border-radius: 50%; }
+
+        /* 筛选按钮和面板 */
+        .filter-toggle {
+            position: absolute;
+            bottom: 30px; left: 10px;
+            background: rgba(255,255,255,0.95);
+            padding: 7px 12px; border-radius: 10px;
+            font-size: 0.8em; font-family: 'Microsoft YaHei', sans-serif;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+            cursor: pointer; z-index: 1000;
+            display: flex; align-items: center; gap: 5px;
+            border: none; color: #444;
+        }
+        .filter-toggle.active { background: #e9d5ff; color: #6d28d9; }
+        #filterPanel {
+            display: none;
+            position: absolute;
+            bottom: 75px; left: 10px;
+            background: rgba(255,255,255,0.97);
+            padding: 10px 12px; border-radius: 12px;
+            font-size: 0.8em; font-family: 'Microsoft YaHei', sans-serif;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15); z-index: 1000;
+            min-width: 140px;
+        }
+        #filterPanel.visible { display: block; }
+
+        /* 数据面板 */
+        #dataPanel {
+            display: none;
+            position: absolute;
+            top: 60px; right: 10px;
+            background: rgba(255,255,255,0.97);
+            padding: 12px; border-radius: 12px;
+            font-size: 0.8em; font-family: 'Microsoft YaHei', sans-serif;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.15); z-index: 1000;
+            min-width: 160px;
+        }
+        #dataPanel.visible { display: block; }
+        .data-btn {
+            width: 100%; padding: 7px; margin: 4px 0;
+            border: none; border-radius: 8px;
+            cursor: pointer; font-size: 0.85em;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+        }
+        #exportBtn { background: #e9d5ff; color: #6d28d9; }
+        #exportBtn:hover { background: #ddd6fe; }
+        #importBtn { background: #d1fae5; color: #065f46; }
+        #importBtn:hover { background: #a7f3d0; }
+        #importFile { display: none; }
+        .data-hint { font-size: 0.75em; color: #999; margin-top: 6px; text-align: center; }
+        .filter-item {
+            display: flex; align-items: center; gap: 6px;
+            padding: 4px 0; cursor: pointer;
+        }
+        .filter-item input { accent-color: #7c3aed; }
+        .filter-cat {
+            display: inline-block; padding: 1px 6px;
+            border-radius: 8px; font-size: 0.9em;
+        }
+        /* 筛选时隐藏 marker */
+        .spot-marker.filtered { display: none; }
+    </style>
+</head>
+<body>
+<div class="page">
+    <div class="header">
+        <div class="header-left">
+            <h1>🏝️ 大理洱海一日游</h1>
+            <p>点击景点查看详情，拖拽图片上传打卡照</p>
+        </div>
+        <div class="header-btns">
+            <button id="measureBtn" class="hbtn" onclick="toggleMeasure()">📏 测距</button>
+            <button id="debugBtn"   class="hbtn" onclick="toggleDebug()">🛠 调坐标</button>
+            <button id="dataBtn"    class="hbtn" onclick="toggleDataPanel()">💾 数据</button>
+        </div>
+    </div>
+    <div id="map"></div>
+
+    <div id="measureHint">选择第一个地点…</div>
+
+    <!-- 搜索框 -->
+    <div id="searchBox">
+        <div class="search-row">
+            <input id="searchInput" placeholder="🔍 搜索地点…" autocomplete="off" />
+            <button id="searchClear" onclick="clearSearch()">✕</button>
+            <select id="citySelect">
+                <option value="云南">云南</option>
+                <option value="大理">大理</option>
+                <option value="全国" selected>全国</option>
+                <option value="北京">北京</option>
+                <option value="上海">上海</option>
+                <option value="广州">广州</option>
+                <option value="成都">成都</option>
+                <option value="昆明">昆明</option>
+            </select>
+        </div>
+        <div id="searchResults"></div>
+    </div>
+
+    <div id="measureResult">
+        <div class="from-to" id="measureFromTo"></div>
+        <div class="dist"    id="measureDist"></div>
+        <div class="dist-unit">公里（直线距离）</div>
+        <button class="close-btn" onclick="closeMeasure()">关闭</button>
+    </div>
+
+    <!-- 筛选按钮和面板 -->
+    <button class="filter-toggle" id="filterToggle" onclick="toggleFilter()">🏷️ 筛选地点</button>
+    <div id="filterPanel">
+        <div style="margin-bottom:6px;color:#666;font-size:0.85em;">勾选显示类别：</div>
+        <div id="filterList"></div>
+    </div>
+
+    <!-- 数据导出导入面板 -->
+    <div id="dataPanel">
+        <button class="data-btn" id="exportBtn" onclick="exportData()">📤 导出数据</button>
+        <button class="data-btn" id="importBtn" onclick="document.getElementById('importFile').click()">📥 导入数据</button>
+        <input type="file" id="importFile" accept=".json" onchange="importData(this)" />
+        <div class="data-hint">导出所有地点、坐标、图片、分类</div>
+    </div>
+
+    <div id="coordPanel">
+        <h5>🛠 坐标调试</h5>
+        <div id="coordList"></div>
+        <div id="addSpotForm">
+            <label>新增地点</label>
+            <input id="newSpotName"  placeholder="地点名称" />
+            <input id="newSpotEmoji" placeholder="Emoji（如 🌟）" />
+            <button class="panel-btn" id="pickBtn" onclick="startPick()">📍 点击地图取坐标</button>
+            <div id="pickHint">请在地图上点击选取位置…</div>
+            <button class="panel-btn" id="addSpotBtn" onclick="confirmAddSpot()">✅ 添加地点</button>
+        </div>
+        <button class="panel-btn" id="copyBtn" onclick="copyCoords()">复制全部坐标</button>
+    </div>
+</div>
+
+<div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#FFB6C1;"></div>西路景点</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#87CEEB;"></div>东路景点</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#DDA0DD;"></div>古城</div>
+</div>
+
+<!-- Lightbox -->
+<div id="lightbox">
+    <button id="lbClose" onclick="closeLightbox()">✕</button>
+    <button class="lb-arrow" id="lbPrev" onclick="lbShift(-1)">‹</button>
+    <img id="lbImg" src="" alt="">
+    <button class="lb-arrow" id="lbNext" onclick="lbShift(1)">›</button>
+    <div id="lbCounter"></div>
+</div>
+
+<script>
+// ── 地图 ──────────────────────────────────────────────────
+const map = L.map('map', { center: [25.82, 100.19], zoom: 12 });
+L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+    subdomains: ['1','2','3','4'], attribution: '© 高德地图', maxZoom: 18
+}).addTo(map);
+
+// ── 景点数据 ──────────────────────────────────────────────
+const spots = [
+    { id:'xizhou',    name:'喜洲古镇', emoji:'🏘️', latlng:[25.9014,100.1197], meta:'往返 4.8km · 14分钟',   desc:'白族民居建筑群，推荐品尝喜洲粑粑。',         color:'#FFB6C1', category:'打卡' },
+    { id:'shuanglang',name:'双廊古镇', emoji:'🌅', latlng:[25.9611,100.2211], meta:'往返 16km · 1小时',     desc:'苍洱风光第一村，夕阳景色绝美。',             color:'#87CEEB', category:'打卡' },
+    { id:'xiaoputo',  name:'小普陀',   emoji:'🦅', latlng:[25.8667,100.2050], meta:'往返 15km · 25分钟',    desc:'冬季红嘴鸥聚集地，洱海中的袖珍岛屿。',       color:'#87CEEB', category:'打卡' },
+    { id:'cuncun',    name:'才村码头', emoji:'🚴', latlng:[25.7480,100.1620], meta:'10km · 20分钟',         desc:'环海骑行起点，离古城最近的海边。',           color:'#FFB6C1', category:'打卡' },
+    { id:'longkan',   name:'龙龛码头', emoji:'🌄', latlng:[25.6720,100.1480], meta:'日出胜地 · 水杉林',     desc:'观赏洱海日出的顶级机位，水杉林倒影极美。',   color:'#FFB6C1', category:'打卡' },
+    { id:'dali',      name:'大理古城', emoji:'🏯', latlng:[25.6942,100.1608], meta:'旅途起点 · 文献名邦',   desc:'五华楼 × 人民路，底蕴深厚。',               color:'#DDA0DD', category:'打卡' },
+    { id:'binhe',     name:'挖色镇',   emoji:'🌊', latlng:[25.8050,100.2480], meta:'5km · 6分钟',           desc:'静谧海滨小镇，游客少，适合慢游。',           color:'#87CEEB', category:'打卡' },
+    { id:'wenshucun', name:'文笔村',   emoji:'🎨', latlng:[25.7380,100.2350], meta:'4.5km · 8分钟',         desc:'充满文艺氛围的小村落，民宿和小店众多。',     color:'#87CEEB', category:'打卡' }
+];
+
+// ── 照片存储（每个地点存数组） ────────────────────────────
+function getPhotos(id)       { return JSON.parse(localStorage.getItem('photos_'+id) || '[]'); }
+function savePhotos(id, arr) {
+    try {
+        localStorage.setItem('photos_'+id, JSON.stringify(arr));
+    } catch (e) {
+        alert('⚠️ 存储空间不足，请删除一些图片或压缩后重试');
+        console.error('localStorage 已满:', e);
+    }
+}
+
+// ── Lightbox ──────────────────────────────────────────────
+let lbPhotos = [], lbIdx = 0;
+function openLightbox(photos, idx) {
+    lbPhotos = photos; lbIdx = idx;
+    document.getElementById('lightbox').classList.add('visible');
+    renderLb();
+}
+function renderLb() {
+    document.getElementById('lbImg').src = lbPhotos[lbIdx];
+    document.getElementById('lbCounter').textContent = `${lbIdx+1} / ${lbPhotos.length}`;
+    document.getElementById('lbPrev').style.display = lbPhotos.length > 1 ? '' : 'none';
+    document.getElementById('lbNext').style.display = lbPhotos.length > 1 ? '' : 'none';
+}
+function lbShift(d) { lbIdx = (lbIdx + d + lbPhotos.length) % lbPhotos.length; renderLb(); }
+function closeLightbox() { document.getElementById('lightbox').classList.remove('visible'); }
+document.getElementById('lightbox').addEventListener('click', e => { if (e.target === e.currentTarget) closeLightbox(); });
+document.addEventListener('keydown', e => {
+    if (!document.getElementById('lightbox').classList.contains('visible')) return;
+    if (e.key === 'ArrowLeft')  lbShift(-1);
+    if (e.key === 'ArrowRight') lbShift(1);
+    if (e.key === 'Escape')     closeLightbox();
+});
+
+// ── popup 内容 ────────────────────────────────────────────
+function makePopupContent(spot) {
+    const photos = getPhotos(spot.id);
+    const stripHtml = photos.length
+        ? `<div class="photo-strip-wrap">
+               <div class="photo-strip" id="strip-${spot.id}">
+                   ${photos.map((p,i) => `
+                       <div class="photo-thumb" data-idx="${i}">
+                           <img src="${p}" draggable="false">
+                           <button class="del-btn" data-idx="${i}">✕</button>
+                       </div>`).join('')}
+               </div>
+               <div class="photo-counter">${photos.length} 张打卡照</div>
+           </div>
+           <div class="add-more" id="addmore-${spot.id}">＋ 拖拽或点击添加更多</div>`
+        : `<div class="drop-zone" id="dz-${spot.id}">
+               <div class="drop-zone-text"><span class="icon">📷</span>拖拽打卡照到这里</div>
+           </div>`;
+    return `<div class="popup-inner popup-view-mode" data-id="${spot.id}">
+        <h4>${spot.emoji} ${spot.name}
+            <button class="popup-edit-btn" title="编辑描述">✏️</button>
+        </h4>
+        <div class="view-fields">
+            <div class="meta">${spot.meta}</div>
+            <div class="desc">${spot.desc}</div>
+            <div style="margin-top:6px;"><span class="filter-cat" style="background:#e9d5ff;color:#6d28d9;">${spot.category || '打卡'}</span></div>
+        </div>
+        <div class="edit-fields">
+            <label>距离/时间</label>
+            <input class="ef-meta" value="${spot.meta}" placeholder="如：往返 4.8km · 14分钟" />
+            <label>分类</label>
+            <input class="ef-cat" value="${spot.category || '打卡'}" placeholder="如：打卡、美食、住宿" />
+            <label>描述</label>
+            <textarea class="ef-desc" rows="3" placeholder="景点描述…">${spot.desc}</textarea>
+            <button class="edit-save-btn">💾 保存</button>
+            <button class="edit-cancel-btn">取消</button>
+        </div>
+        ${stripHtml}
+    </div>`;
+}
+
+// ── 绑定 popup 内的交互 ───────────────────────────────────
+function bindPopup(spotId) {
+    const inner = document.querySelector(`.popup-inner[data-id="${spotId}"]`);
+    if (!inner) return;
+
+    // 可编辑描述 — 编辑按钮切换模式
+    const editBtn    = inner.querySelector('.popup-edit-btn');
+    const saveBtn    = inner.querySelector('.edit-save-btn');
+    const cancelBtn  = inner.querySelector('.edit-cancel-btn');
+
+    editBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        inner.classList.replace('popup-view-mode', 'popup-edit-mode');
+    });
+    cancelBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        inner.classList.replace('popup-edit-mode', 'popup-view-mode');
+    });
+    saveBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        const spot = allSpots.find(s => s.id === spotId);
+        if (!spot) return;
+        spot.meta = inner.querySelector('.ef-meta').value.trim();
+        spot.desc = inner.querySelector('.ef-desc').value.trim();
+        spot.category = inner.querySelector('.ef-cat').value.trim() || '打卡';
+        localStorage.setItem('spotInfo_' + spotId, JSON.stringify({ meta: spot.meta, desc: spot.desc, category: spot.category }));
+        // 更新显示
+        inner.querySelector('.meta').textContent = spot.meta;
+        inner.querySelector('.desc').textContent = spot.desc;
+        updateFilterPanel(); // 更新筛选面板
+        inner.classList.replace('popup-edit-mode', 'popup-view-mode');
+    });
+
+    // 阻止编辑区域触发地图拖动
+    inner.querySelectorAll('input, textarea').forEach(el => {
+        el.addEventListener('mousedown', e => e.stopPropagation());
+    });
+
+    // 拖拽上传（空状态 drop-zone）
+    const dz = inner.querySelector(`#dz-${spotId}`);
+    if (dz) bindDrop(dz, spotId, false);
+
+    // 追加区
+    const addMore = inner.querySelector(`#addmore-${spotId}`);
+    if (addMore) {
+        bindDrop(addMore, spotId, true);
+        addMore.addEventListener('click', () => triggerFilePick(spotId, true));
+    }
+
+    // 缩略图点击 → lightbox；删除按钮
+    const strip = inner.querySelector(`#strip-${spotId}`);
+    if (strip) {
+        strip.querySelectorAll('.photo-thumb').forEach(thumb => {
+            thumb.querySelector('img').addEventListener('click', () => {
+                openLightbox(getPhotos(spotId), +thumb.dataset.idx);
+            });
+            thumb.querySelector('.del-btn').addEventListener('click', e => {
+                e.stopPropagation();
+                const photos = getPhotos(spotId);
+                photos.splice(+thumb.dataset.idx, 1);
+                savePhotos(spotId, photos);
+                refreshPopup(spotId);
+            });
+        });
+    }
+}
+
+function bindDrop(el, spotId, append) {
+    el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('drag-over'); });
+    el.addEventListener('dragleave', () => el.classList.remove('drag-over'));
+    el.addEventListener('drop', e => {
+        e.preventDefault(); el.classList.remove('drag-over');
+        readFiles(e.dataTransfer.files, spotId, append);
+    });
+    if (!append) el.addEventListener('click', () => triggerFilePick(spotId, false));
+}
+
+function triggerFilePick(spotId, append) {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'image/*'; inp.multiple = true;
+    inp.onchange = () => readFiles(inp.files, spotId, append);
+    inp.click();
+}
+
+function readFiles(files, spotId, append) {
+    const photos = append ? getPhotos(spotId) : [];
+    let pending = files.length;
+    let success = 0;
+    if (!pending) return;
+
+    Array.from(files).forEach(f => {
+        if (!f.type.startsWith('image/')) { pending--; checkDone(); return; }
+        // 限制单张图片不超过 2MB
+        if (f.size > 2 * 1024 * 1024) {
+            alert(`⚠️ "${f.name}" 超过 2MB，已跳过`);
+            pending--;
+            checkDone();
+            return;
+        }
+        const r = new FileReader();
+        r.onload = ev => {
+            photos.push(ev.target.result);
+            success++;
+            checkDone();
+        };
+        r.onerror = () => {
+            console.error('读取失败:', f.name);
+            checkDone();
+        };
+        r.readAsDataURL(f);
+    });
+
+    function checkDone() {
+        pending--;
+        if (pending === 0) {
+            if (success > 0) {
+                savePhotos(spotId, photos);
+                refreshPopup(spotId);
+            }
+        }
+    }
+}
+
+function refreshPopup(spotId) {
+    const spot = allSpots.find(s => s.id === spotId);
+    if (!spot) return;
+    const m = markerMap[spotId];
+    if (m && m.isPopupOpen()) {
+        m.getPopup().setContent(makePopupContent(spot));
+        setTimeout(() => bindPopup(spotId), 30);
+    }
+}
+
+// ── marker 图标 ───────────────────────────────────────────
+function makeIcon(spot) {
+    return L.divIcon({
+        html: `<div class="spot-pin">
+                   <div class="pin-head" style="background:${spot.color};">
+                       <span class="pin-emoji">${spot.emoji}</span>
+                   </div>
+                   <div class="pin-label">${spot.name}</div>
+               </div>`,
+        className: 'spot-marker',
+        iconSize: [60, 62], iconAnchor: [19, 58], popupAnchor: [11, -58]
+    });
+}
+
+// ── 坐标存储 ──────────────────────────────────────────────
+const currentCoords = {};
+spots.forEach(s => {
+    const saved = localStorage.getItem('coord_'+s.id);
+    currentCoords[s.id] = saved ? JSON.parse(saved) : [...s.latlng];
+});
+
+// allSpots 包含内置 + 新增
+let allSpots = [...spots];
+const markerMap = {};
+
+// 恢复已编辑的描述（必须在 addMarker 之前，否则 popup 内容用旧值渲染）
+allSpots.forEach(s => {
+    const info = JSON.parse(localStorage.getItem('spotInfo_' + s.id) || '{}');
+    if (info.meta !== undefined) s.meta = info.meta;
+    if (info.desc !== undefined) s.desc = info.desc;
+    if (info.category !== undefined) s.category = info.category;
+});
+
+function addMarker(spot) {
+    const latlng = currentCoords[spot.id] || spot.latlng;
+    const marker = L.marker(latlng, { icon: makeIcon(spot), draggable: false });
+
+    // 动态生成 popup 内容（每次打开时重新读取最新数据）
+    marker.bindPopup(() => makePopupContent(allSpots.find(s => s.id === spot.id) || spot));
+
+    marker.on('click', () => {
+        if (measureMode) { onMeasureClick(spot); return; }
+        if (debugMode)   return;
+        marker.openPopup();
+    });
+    marker.on('popupopen', () => setTimeout(() => bindPopup(spot.id), 40));
+    marker.on('dragend', () => {
+        const ll = marker.getLatLng();
+        currentCoords[spot.id] = [+ll.lat.toFixed(6), +ll.lng.toFixed(6)];
+        localStorage.setItem('coord_'+spot.id, JSON.stringify(currentCoords[spot.id]));
+        updateCoordPanel();
+    });
+    marker.addTo(map);
+    markerMap[spot.id] = marker;
+}
+
+spots.forEach(addMarker);
+
+// ── 测距 ──────────────────────────────────────────────────
+let measureMode = false, measurePicks = [];
+
+function toggleMeasure() {
+    measureMode = !measureMode;
+    const btn = document.getElementById('measureBtn');
+    btn.classList.toggle('active-green', measureMode);
+    btn.textContent = measureMode ? '❌ 取消测距' : '📏 测距';
+    const hint = document.getElementById('measureHint');
+    hint.classList.toggle('visible', measureMode);
+    hint.innerHTML = '选择第一个地点…';
+    measurePicks = [];
+    if (!measureMode) document.querySelectorAll('.spot-marker').forEach(e => e.classList.remove('measure-selected'));
+}
+
+function onMeasureClick(spot) {
+    if (measurePicks.find(p => p.id === spot.id)) return;
+    measurePicks.push(spot);
+    const el = markerMap[spot.id].getElement();
+    if (el) el.classList.add('measure-selected');
+    const hint = document.getElementById('measureHint');
+    if (measurePicks.length === 1) {
+        hint.innerHTML = `已选：<span>${spot.name}</span>，再选第二个地点`;
+    } else {
+        const a = currentCoords[measurePicks[0].id];
+        const b = currentCoords[measurePicks[1].id];
+        const dist = (map.distance(a, b) / 1000).toFixed(2);
+        document.getElementById('measureFromTo').textContent = `${measurePicks[0].name}  →  ${measurePicks[1].name}`;
+        document.getElementById('measureDist').textContent = dist;
+        document.getElementById('measureResult').classList.add('visible');
+        hint.classList.remove('visible');
+        measureMode = false;
+        document.getElementById('measureBtn').classList.remove('active-green');
+        document.getElementById('measureBtn').textContent = '📏 测距';
+    }
+}
+
+function closeMeasure() {
+    document.getElementById('measureResult').classList.remove('visible');
+    measurePicks = [];
+    document.querySelectorAll('.spot-marker').forEach(e => e.classList.remove('measure-selected'));
+}
+
+// ── Debug 模式 ────────────────────────────────────────────
+let debugMode = false, pickingCoord = false, pendingCoord = null;
+
+function toggleDebug() {
+    debugMode = !debugMode;
+    document.getElementById('debugBtn').classList.toggle('active-pink', debugMode);
+    document.getElementById('debugBtn').textContent = debugMode ? '✅ 退出调试' : '🛠 调坐标';
+    document.getElementById('coordPanel').classList.toggle('visible', debugMode);
+    allSpots.forEach(s => {
+        const m = markerMap[s.id];
+        if (m) debugMode ? m.dragging.enable() : m.dragging.disable();
+    });
+    if (debugMode) updateCoordPanel();
+    if (!debugMode) cancelPick();
+}
+
+function updateCoordPanel() {
+    document.getElementById('coordList').innerHTML = allSpots.map(s => {
+        const orig = s.latlng, cur = currentCoords[s.id] || orig;
+        const changed = orig[0] !== cur[0] || orig[1] !== cur[1];
+        return `<div class="coord-row">
+            <span class="coord-name">${s.emoji} ${s.name}</span>
+            <span class="coord-val${changed?' changed':''}">${cur[0]}, ${cur[1]}</span>
+        </div>`;
+    }).join('');
+}
+
+function copyCoords() {
+    const txt = allSpots.map(s => {
+        const c = currentCoords[s.id] || s.latlng;
+        return `latlng: [${c[0]}, ${c[1]}],  // ${s.name}`;
+    }).join('\n');
+    navigator.clipboard.writeText(txt).then(() => {
+        const btn = document.getElementById('copyBtn');
+        btn.textContent = '✅ 已复制！';
+        setTimeout(() => btn.textContent = '复制全部坐标', 1500);
+    });
+}
+
+// 新增地点 — 点地图取坐标
+function startPick() {
+    if (pickingCoord) { cancelPick(); return; }
+    pickingCoord = true;
+    pendingCoord = null;
+    document.getElementById('pickBtn').classList.add('picking');
+    document.getElementById('pickBtn').textContent = '🚫 取消取坐标';
+    document.getElementById('pickHint').style.display = 'block';
+    document.getElementById('pickHint').textContent = '请在地图上点击选取位置…';
+    map.once('click', onMapPick);
+}
+
+function onMapPick(e) {
+    pickingCoord = false;
+    pendingCoord = [+e.latlng.lat.toFixed(6), +e.latlng.lng.toFixed(6)];
+    document.getElementById('pickBtn').classList.remove('picking');
+    document.getElementById('pickBtn').textContent = '📍 重新取坐标';
+    document.getElementById('pickHint').textContent = `✅ 已选：${pendingCoord[0]}, ${pendingCoord[1]}`;
+}
+
+function cancelPick() {
+    pickingCoord = false; pendingCoord = null;
+    map.off('click', onMapPick);
+    document.getElementById('pickBtn').classList.remove('picking');
+    document.getElementById('pickBtn').textContent = '📍 点击地图取坐标';
+    document.getElementById('pickHint').style.display = 'none';
+}
+
+function confirmAddSpot() {
+    const name  = document.getElementById('newSpotName').value.trim();
+    const emoji = document.getElementById('newSpotEmoji').value.trim() || '📍';
+    if (!name)         { alert('请填写地点名称'); return; }
+    if (!pendingCoord) { alert('请先点击地图取坐标'); return; }
+
+    const id = 'custom_' + Date.now();
+    const spot = { id, name, emoji, latlng: pendingCoord, meta: '', desc: '', color: '#a78bfa' };
+    allSpots.push(spot);
+    currentCoords[id] = [...pendingCoord];
+    localStorage.setItem('coord_'+id, JSON.stringify(pendingCoord));
+
+    // 持久化新增列表
+    const customs = JSON.parse(localStorage.getItem('customSpots') || '[]');
+    customs.push(spot);
+    localStorage.setItem('customSpots', JSON.stringify(customs));
+
+    addMarker(spot);
+    if (debugMode) markerMap[id].dragging.enable();
+    updateCoordPanel();
+
+    // 重置表单
+    document.getElementById('newSpotName').value = '';
+    document.getElementById('newSpotEmoji').value = '';
+    cancelPick();
+}
+
+// 恢复自定义地点（同时应用 spotInfo_ 数据）
+JSON.parse(localStorage.getItem('customSpots') || '[]').forEach(s => {
+    if (!allSpots.find(x => x.id === s.id)) {
+        // 应用保存的 spotInfo
+        const info = JSON.parse(localStorage.getItem('spotInfo_' + s.id) || '{}');
+        if (info.meta) s.meta = info.meta;
+        if (info.desc) s.desc = info.desc;
+        if (info.category) s.category = info.category;
+        allSpots.push(s);
+        addMarker(s);
+    }
+});
+
+// ── 地点搜索（高德 PlaceSearch） ─────────────────────────
+let searchTimer = null, searchMarker = null, placeSearch = null;
+
+// 等高德 API 加载完再初始化
+function initAMapSearch() {
+    placeSearch = new AMap.PlaceSearch({ pageSize: 6, pageIndex: 1, city: '云南', citylimit: false });
+}
+if (window.AMap) initAMapSearch();
+else window.addEventListener('load', initAMapSearch);
+
+const searchInput   = document.getElementById('searchInput');
+const searchResults = document.getElementById('searchResults');
+const searchClear   = document.getElementById('searchClear');
+
+searchInput.addEventListener('input', () => {
+    const q = searchInput.value.trim();
+    searchClear.style.display = q ? 'block' : 'none';
+    clearTimeout(searchTimer);
+    if (!q) { searchResults.style.display = 'none'; return; }
+    searchResults.style.display = 'block';
+    searchResults.innerHTML = '<div class="search-loading">搜索中…</div>';
+    searchTimer = setTimeout(() => doSearch(q), 400);
+});
+
+searchInput.addEventListener('keydown', e => {
+    if (e.key === 'Escape') clearSearch();
+});
+
+function doSearch(q) {
+    if (!placeSearch) {
+        searchResults.innerHTML = '<div class="search-loading">地图服务加载中，请稍候…</div>';
+        return;
+    }
+    const city = document.getElementById('citySelect').value;
+    placeSearch.setCity(city === '全国' ? '' : city);
+    placeSearch.setCityLimit(city !== '全国');
+    placeSearch.search(q, (status, result) => {
+        if (status !== 'complete' || !result.poiList || !result.poiList.pois.length) {
+            searchResults.innerHTML = '<div class="search-loading">没有找到结果</div>';
+            return;
+        }
+        const pois = result.poiList.pois;
+        searchResults.innerHTML = pois.map((poi, i) => {
+            const addr = poi.address || poi.cityname || '';
+            return `<div class="search-item" data-i="${i}">
+                <div class="si-name">${poi.name}</div>
+                <div class="si-addr">${addr}</div>
+            </div>`;
+        }).join('');
+        searchResults.querySelectorAll('.search-item').forEach(el => {
+            el.addEventListener('click', () => {
+                const poi = pois[+el.dataset.i];
+                // 高德坐标是 GCJ-02，转 WGS-84 给 Leaflet 用
+                const lnglat = poi.location;
+                const wgs = gcj02ToWgs84(lnglat.lng, lnglat.lat);
+                selectResult(wgs[1], wgs[0], poi.name);
+            });
+        });
+    });
+}
+
+// GCJ-02 → WGS-84 偏移修正（高德坐标系 → Leaflet 标准坐标系）
+function gcj02ToWgs84(lng, lat) {
+    const a = 6378245.0, ee = 0.00669342162296594323;
+    let dlat = transformLat(lng - 105.0, lat - 35.0);
+    let dlng = transformLng(lng - 105.0, lat - 35.0);
+    const radlat = lat / 180.0 * Math.PI;
+    let magic = Math.sin(radlat);
+    magic = 1 - ee * magic * magic;
+    const sqrtmagic = Math.sqrt(magic);
+    dlat = (dlat * 180.0) / ((a * (1 - ee)) / (magic * sqrtmagic) * Math.PI);
+    dlng = (dlng * 180.0) / (a / sqrtmagic * Math.cos(radlat) * Math.PI);
+    return [lng - dlng, lat - dlat];
+}
+function transformLat(x, y) {
+    let r = -100.0 + 2.0*x + 3.0*y + 0.2*y*y + 0.1*x*y + 0.2*Math.sqrt(Math.abs(x));
+    r += (20.0*Math.sin(6.0*x*Math.PI) + 20.0*Math.sin(2.0*x*Math.PI)) * 2.0/3.0;
+    r += (20.0*Math.sin(y*Math.PI) + 40.0*Math.sin(y/3.0*Math.PI)) * 2.0/3.0;
+    r += (160.0*Math.sin(y/12.0*Math.PI) + 320*Math.sin(y*Math.PI/30.0)) * 2.0/3.0;
+    return r;
+}
+function transformLng(x, y) {
+    let r = 300.0 + x + 2.0*y + 0.1*x*x + 0.1*x*y + 0.1*Math.sqrt(Math.abs(x));
+    r += (20.0*Math.sin(6.0*x*Math.PI) + 20.0*Math.sin(2.0*x*Math.PI)) * 2.0/3.0;
+    r += (20.0*Math.sin(x*Math.PI) + 40.0*Math.sin(x/3.0*Math.PI)) * 2.0/3.0;
+    r += (150.0*Math.sin(x/12.0*Math.PI) + 300.0*Math.sin(x/30.0*Math.PI)) * 2.0/3.0;
+    return r;
+}
+
+function selectResult(lat, lon, name) {
+    map.setView([lat, lon], 15, { animate: true });
+    if (searchMarker) map.removeLayer(searchMarker);
+    searchMarker = L.marker([lat, lon]).addTo(map).bindPopup(`<b>${name}</b>`).openPopup();
+    searchResults.style.display = 'none';
+    searchInput.value = name;
+}
+
+function clearSearch() {
+    searchInput.value = '';
+    searchClear.style.display = 'none';
+    searchResults.style.display = 'none';
+    if (searchMarker) { map.removeLayer(searchMarker); searchMarker = null; }
+}
+
+// ── 筛选功能 ──────────────────────────────────────────────
+let activeCats = new Set(); // 已勾选的分类
+
+function getAllCategories() {
+    const cats = new Set();
+    allSpots.forEach(s => cats.add(s.category || '打卡'));
+    return Array.from(cats).sort();
+}
+
+function toggleFilter() {
+    const panel = document.getElementById('filterPanel');
+    const btn = document.getElementById('filterToggle');
+    panel.classList.toggle('visible');
+    btn.classList.toggle('active', panel.classList.contains('visible'));
+    if (panel.classList.contains('visible')) updateFilterPanel();
+}
+
+function updateFilterPanel() {
+    const cats = getAllCategories();
+    const list = document.getElementById('filterList');
+    list.innerHTML = cats.map(c => {
+        const checked = activeCats.has(c) || activeCats.size === 0 ? 'checked' : '';
+        return `<div class="filter-item">
+            <input type="checkbox" data-cat="${c}" ${checked} onchange="toggleCat('${c}')" />
+            <span>${c}</span>
+        </div>`;
+    }).join('');
+}
+
+function toggleCat(cat) {
+    if (activeCats.has(cat)) activeCats.delete(cat);
+    else activeCats.add(cat);
+    applyFilter();
+}
+
+function applyFilter() {
+    const showAll = activeCats.size === 0;
+    allSpots.forEach(s => {
+        const m = markerMap[s.id];
+        if (!m) return;
+        const el = m.getElement();
+        if (!el) return;
+        if (showAll || activeCats.has(s.category)) {
+            el.classList.remove('filtered');
+        } else {
+            el.classList.add('filtered');
+        }
+    });
+}
+
+// ── 数据导出导入 ──────────────────────────────────────────
+function toggleDataPanel() {
+    const panel = document.getElementById('dataPanel');
+    panel.classList.toggle('visible');
+}
+
+function exportData() {
+    const data = {
+        version: 1,
+        exportTime: new Date().toISOString(),
+        coords: {},
+        spotInfos: {},
+        photos: {},
+        customSpots: JSON.parse(localStorage.getItem('customSpots') || '[]')
+    };
+    // 导出所有坐标
+    allSpots.forEach(s => {
+        data.coords[s.id] = currentCoords[s.id] || s.latlng;
+    });
+    // 导出所有描述/分类
+    allSpots.forEach(s => {
+        const info = JSON.parse(localStorage.getItem('spotInfo_' + s.id) || '{}');
+        if (Object.keys(info).length) data.spotInfos[s.id] = info;
+    });
+    // 导出所有图片
+    allSpots.forEach(s => {
+        const photos = JSON.parse(localStorage.getItem('photos_' + s.id) || '[]');
+        if (photos.length) data.photos[s.id] = photos;
+    });
+
+    const json = JSON.stringify(data);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '洱海地图数据_' + new Date().toISOString().slice(0,10) + '.json';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function importData(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        try {
+            const data = JSON.parse(e.target.result);
+            if (!data.version) throw new Error('无效的数据文件');
+
+            // 恢复坐标
+            if (data.coords) {
+                Object.entries(data.coords).forEach(([id, coord]) => {
+                    localStorage.setItem('coord_' + id, JSON.stringify(coord));
+                    if (currentCoords[id]) currentCoords[id] = coord;
+                });
+            }
+            // 恢复描述/分类
+            if (data.spotInfos) {
+                Object.entries(data.spotInfos).forEach(([id, info]) => {
+                    localStorage.setItem('spotInfo_' + id, JSON.stringify(info));
+                    const spot = allSpots.find(s => s.id === id);
+                    if (spot) {
+                        if (info.meta) spot.meta = info.meta;
+                        if (info.desc) spot.desc = info.desc;
+                        if (info.category) spot.category = info.category;
+                    }
+                });
+            }
+            // 恢复图片
+            if (data.photos) {
+                Object.entries(data.photos).forEach(([id, photos]) => {
+                    localStorage.setItem('photos_' + id, JSON.stringify(photos));
+                });
+            }
+            // 恢复自定义地点
+            if (data.customSpots && data.customSpots.length) {
+                const existing = JSON.parse(localStorage.getItem('customSpots') || '[]');
+                const existIds = new Set(existing.map(s => s.id));
+                data.customSpots.forEach(s => {
+                    if (!existIds.has(s.id)) {
+                        existing.push(s);
+                        existIds.add(s.id);
+                        if (!allSpots.find(x => x.id === s.id)) {
+                            allSpots.push(s);
+                            addMarker(s);
+                        }
+                    }
+                });
+                localStorage.setItem('customSpots', JSON.stringify(existing));
+            }
+
+            alert('✅ 数据导入成功！刷新页面生效。');
+            location.reload();
+        } catch (err) {
+            alert('❌ 导入失败：' + err.message);
+        }
+    };
+    reader.readAsText(file);
+}
+</script>
+</body>
+</html>
