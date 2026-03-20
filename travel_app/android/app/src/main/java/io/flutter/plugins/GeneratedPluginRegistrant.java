@@ -16,6 +16,11 @@ public final class GeneratedPluginRegistrant {
   private static final String TAG = "GeneratedPluginRegistrant";
   public static void registerWith(@NonNull FlutterEngine flutterEngine) {
     try {
+      flutterEngine.getPlugins().add(new com.example.amap_flutter_search.AmapFlutterSearchPlugin());
+    } catch (Exception e) {
+      Log.e(TAG, "Error registering plugin amap_flutter_search, com.example.amap_flutter_search.AmapFlutterSearchPlugin", e);
+    }
+    try {
       flutterEngine.getPlugins().add(new com.amap.flutter.map.AMapFlutterMapPlugin());
     } catch (Exception e) {
       Log.e(TAG, "Error registering plugin amap_map, com.amap.flutter.map.AMapFlutterMapPlugin", e);

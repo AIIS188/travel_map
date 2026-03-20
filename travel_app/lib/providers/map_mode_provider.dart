@@ -3,7 +3,7 @@ import 'package:x_amap_base/x_amap_base.dart';
 
 import '../utils/color_utils.dart';
 
-enum MapMode { normal, measure, addSpot }
+enum MapMode { normal, measure, addSpot, moveSpot }
 
 class MapModeProvider extends ChangeNotifier {
   MapMode _mode = MapMode.normal;
@@ -71,6 +71,17 @@ class MapModeProvider extends ChangeNotifier {
 
   void clearPendingCoord() {
     _pendingCoord = null;
+    notifyListeners();
+  }
+
+  // ── 移动地点 ───────────────────────────────────────────────
+  void enterMoveSpot() {
+    _mode = MapMode.moveSpot;
+    notifyListeners();
+  }
+
+  void exitMoveSpot() {
+    _mode = MapMode.normal;
     notifyListeners();
   }
 }

@@ -9,6 +9,14 @@ packages:
       url: "https://pub.flutter-io.cn"
     source: hosted
     version: "67.0.0"
+  amap_flutter_search:
+    dependency: "direct main"
+    description:
+      name: amap_flutter_search
+      sha256: "7ed6171a146d5d54979afaba81bbbe8f98c544828b4577a12b1a2226014899dc"
+      url: "https://pub.flutter-io.cn"
+    source: hosted
+    version: "0.0.4"
   amap_map:
     dependency: "direct main"
     description:
@@ -361,7 +369,7 @@ packages:
     source: hosted
     version: "1.0.2"
   http:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: http
       sha256: "87721a4a50b19c7f1d49001e51409bddc46303966ce89a65af4f4e6004896412"

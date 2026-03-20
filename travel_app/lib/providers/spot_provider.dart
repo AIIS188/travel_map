@@ -16,16 +16,31 @@ class SpotProvider extends ChangeNotifier {
   Set<String> get activeCategories => _activeCategories;
   bool get isInitialized => _isInitialized;
 
-  /// All unique categories
-  Set<String> get allCategories =>
-      _spots.map((s) => s.category.isEmpty ? '打卡' : s.category).toSet();
+  /// All unique individual category tags (splits by 、)
+  Set<String> get allCategories {
+    final cats = <String>{};
+    for (final s in _spots) {
+      final tags = s.category
+          .split('、')
+          .map((t) => t.trim())
+          .where((t) => t.isNotEmpty)
+          .toList();
+      cats.addAll(tags.isEmpty ? ['打卡'] : tags);
+    }
+    return cats;
+  }
 
   /// Filtered spots for display
   List<Spot> get visibleSpots {
     if (_activeCategories.isEmpty) return List.from(_spots);
-    return _spots
-        .where((s) => _activeCategories.contains(s.category))
-        .toList();
+    return _spots.where((s) {
+      final tags = s.category
+          .split('、')
+          .map((t) => t.trim())
+          .where((t) => t.isNotEmpty)
+          .toSet();
+      return tags.any((t) => _activeCategories.contains(t));
+    }).toList();
   }
 
   Future<void> init() async {

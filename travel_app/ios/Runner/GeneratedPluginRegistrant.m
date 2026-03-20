@@ -6,6 +6,12 @@
 
 #import "GeneratedPluginRegistrant.h"
 
+#if __has_include(<amap_flutter_search/AmapFlutterSearchPlugin.h>)
+#import <amap_flutter_search/AmapFlutterSearchPlugin.h>
+#else
+@import amap_flutter_search;
+#endif
+
 #if __has_include(<amap_map/AMapFlutterMapPlugin.h>)
 #import <amap_map/AMapFlutterMapPlugin.h>
 #else
@@ -39,6 +45,7 @@
 @implementation GeneratedPluginRegistrant
 
 + (void)registerWithRegistry:(NSObject<FlutterPluginRegistry>*)registry {
+  [AmapFlutterSearchPlugin registerWithRegistrar:[registry registrarForPlugin:@"AmapFlutterSearchPlugin"]];
   [AMapFlutterMapPlugin registerWithRegistrar:[registry registrarForPlugin:@"AMapFlutterMapPlugin"]];
   [FilePickerPlugin registerWithRegistrar:[registry registrarForPlugin:@"FilePickerPlugin"]];
   [FLTImagePickerPlugin registerWithRegistrar:[registry registrarForPlugin:@"FLTImagePickerPlugin"]];

@@ -44,3 +44,7 @@ android {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    implementation("com.amap.api:3dmap-location-search:10.1.200_loc6.4.9_sea9.7.4")
+}
